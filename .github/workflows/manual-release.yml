@@ -30,6 +30,9 @@ jobs:
     name: 手動リリース実行
     runs-on: ubuntu-latest
     environment: nuget-release
+    permissions:
+      contents: write
+      id-token: write
     defaults:
       run:
         shell: bash
