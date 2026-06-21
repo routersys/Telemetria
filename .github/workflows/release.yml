@@ -52,16 +52,16 @@ jobs:
           dotnet-version: "10.x"
 
       - name: 依存パッケージを復元
-        run: dotnet restore Telemetria.sln
+        run: dotnet restore Telemetria.slnx
 
       - name: ソリューションをビルド (バージョン番号を注入)
         run: |
-          dotnet build Telemetria.sln -c Release --no-restore \
+          dotnet build Telemetria.slnx -c Release --no-restore \
             -p:Version=${{ steps.parse.outputs.version }}
 
       - name: 全テストを実行してリリース品質を確認
         run: |
-          dotnet test Telemetria.sln -c Release --no-build \
+          dotnet test Telemetria.slnx -c Release --no-build \
             --logger "trx;LogFileName=results.trx" \
             --results-directory ./test-results
 
