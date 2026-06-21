@@ -143,26 +143,57 @@ jobs:
       - name: ダウンロードしたファイルを確認
         run: ls -la ./artifacts/
 
-      - name: NuGet サービスインデックスから Trusted Publishing エンドポイントを探索
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const indexRes = await fetch('https://api.nuget.org/v3/index.json');
-            const index = await indexRes.json();
-            const types = index.resources.map(r => `${r['@type']} => ${r['@id']}`);
-            core.info('NuGet サービスインデックス:\n' + types.join('\n'));
-
-      - name: Trusted Publishing 用 OIDC トークンを取得
+      - name: Trusted Publishing 用トークン交換エンドポイントを探索して API キーを取得
         id: nuget-token
         uses: actions/github-script@v7
         with:
           script: |
             const idToken = await core.getIDToken('api://AzureADTokenExchange');
             core.setSecret(idToken);
-            core.setOutput('token', idToken);
             core.info('GitHub OIDC トークンの取得に成功しました');
 
-      - name: NuGet.org へパッケージを発行 (OIDC トークンを直接使用)
+            const candidates = [
+              'https://www.nuget.org/api/v1/authentication/authenticate',
+              'https://www.nuget.org/api/v2/authentication/authenticate',
+              'https://www.nuget.org/api/v1/authentication/oidc',
+              'https://www.nuget.org/api/v1/authentication/github',
+              'https://www.nuget.org/api/v1/trustedpublishing/authenticate',
+              'https://www.nuget.org/api/v1/publish/authenticate',
+              'https://www.nuget.org/api/v1/authentication/minttoken',
+            ];
+
+            let apiKey = null;
+            for (const endpoint of candidates) {
+              core.info(`試行中: POST ${endpoint}`);
+              const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ oidcToken: idToken }),
+              });
+              core.info(`  → ステータス: ${res.status}`);
+
+              if (res.ok) {
+                const data = await res.json();
+                apiKey = data.tokenValue;
+                core.setSecret(apiKey);
+                core.info(`  → 成功: ${endpoint}`);
+                break;
+              }
+
+              if (res.status !== 404) {
+                const body = await res.text();
+                core.info(`  → 応答本文: ${body}`);
+              }
+            }
+
+            if (!apiKey) {
+              core.setFailed('すべての候補エンドポイントで認証に失敗しました。ログを確認してください。');
+              return;
+            }
+
+            core.setOutput('token', apiKey);
+
+      - name: NuGet.org へパッケージを発行 (Trusted Publishing)
         run: |
           dotnet nuget push ./artifacts/Telemetria.*.nupkg \
             --api-key ${{ steps.nuget-token.outputs.token }} \
