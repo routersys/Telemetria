@@ -75,6 +75,7 @@ jobs:
           name: test-results
           path: test-results/
           retention-days: 30
+          if-no-files-found: warn
 
   pack:
     name: NuGet パッケージの作成
@@ -141,17 +142,25 @@ jobs:
       - name: ダウンロードしたファイルを確認
         run: ls -la ./artifacts/
 
-      - name: NuGet.org の Trusted Publishing 用トークンを取得
+      - name: Trusted Publishing 用 OIDC トークンを取得して NuGet API キーへ交換
         id: nuget-token
-        run: |
-          BEARER=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange" \
-            | jq -r '.value')
-          TOKEN=$(curl -sS -X POST "https://www.nuget.org/api/v1/authentication/authenticate" \
-            -H "Content-Type: application/json" \
-            -d "{\"oidcToken\": \"${BEARER}\"}" \
-            | jq -r '.tokenValue')
-          echo "token=${TOKEN}" >> "$GITHUB_OUTPUT"
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const idToken = await core.getIDToken('api://AzureADTokenExchange');
+            const response = await fetch('https://www.nuget.org/api/v1/authentication/authenticate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ oidcToken: idToken }),
+            });
+            if (!response.ok) {
+              const text = await response.text();
+              core.setFailed(`NuGet 認証に失敗しました (${response.status}): ${text}`);
+              return;
+            }
+            const data = await response.json();
+            core.setSecret(data.tokenValue);
+            core.setOutput('token', data.tokenValue);
 
       - name: NuGet.org へパッケージを発行 (Trusted Publishing)
         run: |
