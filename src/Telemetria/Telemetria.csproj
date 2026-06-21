@@ -3,7 +3,7 @@
   <PropertyGroup>
     <IsPackable>true</IsPackable>
     <PackageId>Telemetria</PackageId>
-    <VersionPrefix>1.0.0</VersionPrefix>
+    <VersionPrefix>1.1.0</VersionPrefix>
     <Authors>routersys</Authors>
     <Company>routersys</Company>
     <Product>Telemetria</Product>
