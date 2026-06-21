@@ -23,6 +23,9 @@ jobs:
   build-and-test:
     name: ビルドとテスト (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +48,9 @@ jobs:
       - name: ソリューションをビルド
         run: dotnet build Telemetria.slnx -c Release --no-restore
 
+      - name: テスト結果ディレクトリを作成
+        run: mkdir -p test-results
+
       - name: テストを実行
         run: |
           dotnet test Telemetria.slnx -c Release --no-build \
@@ -58,6 +64,7 @@ jobs:
           name: test-results-${{ matrix.os }}
           path: test-results/
           retention-days: 7
+          if-no-files-found: warn
 
       - name: パッケージが正常に作成されるか確認
         run: dotnet pack src/Telemetria/Telemetria.csproj -c Release --no-build

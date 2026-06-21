@@ -18,6 +18,9 @@ jobs:
   validate:
     name: バージョン検証とテスト
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
     outputs:
       version: ${{ steps.parse.outputs.version }}
       is_prerelease: ${{ steps.parse.outputs.is_prerelease }}
@@ -77,6 +80,9 @@ jobs:
     name: NuGet パッケージの作成
     runs-on: ubuntu-latest
     needs: validate
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: ソースコードを取得
@@ -116,6 +122,9 @@ jobs:
     runs-on: ubuntu-latest
     needs: [validate, pack]
     environment: nuget-release
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: .NET SDK をセットアップ
@@ -163,6 +172,9 @@ jobs:
     name: GitHub Release の作成
     runs-on: ubuntu-latest
     needs: [validate, pack, publish-nuget]
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: ソースコードを取得 (変更履歴の生成用)

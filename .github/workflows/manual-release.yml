@@ -31,6 +31,9 @@ jobs:
     name: 手動リリース実行
     runs-on: ubuntu-latest
     environment: nuget-release
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - name: ソースコードを取得
