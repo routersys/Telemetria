@@ -33,6 +33,7 @@ jobs:
     permissions:
       contents: write
       id-token: write
+      packages: write
     defaults:
       run:
         shell: bash
@@ -94,6 +95,14 @@ jobs:
           dotnet nuget push ./artifacts/Telemetria.*.snupkg \
             --api-key ${{ steps.nuget-login.outputs.NUGET_API_KEY }} \
             --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate || true
+
+      - name: GitHub Packages へも発行 (リポジトリの Packages セクションに表示)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          dotnet nuget push ./artifacts/Telemetria.*.nupkg \
+            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --source https://nuget.pkg.github.com/routersys/index.json \
             --skip-duplicate || true
 
       - name: ドライランのため発行をスキップ
