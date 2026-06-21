@@ -77,40 +77,16 @@ jobs:
       - name: 作成されたパッケージ一覧を表示
         run: ls -la ./artifacts/
 
-      - name: Trusted Publishing 用 OIDC トークンを取得して NuGet API キーへ交換
+      - name: Trusted Publishing 用 OIDC トークンを取得
         if: ${{ !inputs.dry_run }}
         id: nuget-token
         uses: actions/github-script@v7
         with:
           script: |
-            const audience = 'api://AzureADTokenExchange';
-            const endpoint = 'https://www.nuget.org/api/v1/authentication/authenticate';
-
-            core.info(`OIDC audience: ${audience}`);
-            core.info(`NuGet 認証エンドポイント: ${endpoint}`);
-
-            const idToken = await core.getIDToken(audience);
+            const idToken = await core.getIDToken('api://AzureADTokenExchange');
+            core.setSecret(idToken);
+            core.setOutput('token', idToken);
             core.info('GitHub OIDC トークンの取得に成功しました');
-
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ oidcToken: idToken }),
-            });
-
-            core.info(`NuGet 応答ステータス: ${response.status}`);
-
-            if (!response.ok) {
-              const text = await response.text();
-              core.info(`NuGet 応答本文: ${text}`);
-              core.setFailed(`NuGet 認証に失敗しました (${response.status})`);
-              return;
-            }
-
-            const data = await response.json();
-            core.setSecret(data.tokenValue);
-            core.setOutput('token', data.tokenValue);
-            core.info('NuGet 一時 API キーの取得に成功しました');
 
       - name: NuGet.org へ発行 (ドライランでない場合のみ)
         if: ${{ !inputs.dry_run }}
