@@ -154,6 +154,47 @@ public sealed class DependencyInjectionTests : IDisposable
         Assert.NotNull(scope);
     }
 
+    [Fact]
+    public void AddTelemetria_NoRequestSigning_ResolvesNullSigner()
+    {
+        using var provider = Build(_ => { });
+        var signer = provider.GetRequiredService<IRequestSigner>();
+        Assert.Empty(signer.Sign("data"u8));
+    }
+
+    [Fact]
+    public void AddTelemetria_UseRequestSigning_ResolvesEcdsaSigner()
+    {
+        var keyPair = EcdsaSigningKeyPair.Generate();
+        using var provider = Build(builder =>
+            builder.UseRequestSigning(o => o.PrivateKeyBase64 = keyPair.PrivateKeyBase64));
+
+        Assert.IsType<EcdsaRequestSigner>(provider.GetRequiredService<IRequestSigner>());
+    }
+
+    [Fact]
+    public void AddTelemetria_UseRequestSigning_SignerProducesVerifiableSignature()
+    {
+        var keyPair = EcdsaSigningKeyPair.Generate();
+        using var provider = Build(builder =>
+            builder.UseRequestSigning(o => o.PrivateKeyBase64 = keyPair.PrivateKeyBase64));
+
+        using var signer = (EcdsaRequestSigner)provider.GetRequiredService<IRequestSigner>();
+        var payload = "telemetria"u8;
+        var sig = signer.Sign(payload);
+        Assert.True(signer.Verify(payload, sig));
+    }
+
+    [Fact]
+    public void AddTelemetria_UseRequestSigning_EmptyKey_ThrowsAtResolution()
+    {
+        using var provider = Build(builder =>
+            builder.UseRequestSigning(o => o.PrivateKeyBase64 = string.Empty));
+
+        Assert.Throws<InvalidOperationException>(
+            () => provider.GetRequiredService<IRequestSigner>());
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_directory))

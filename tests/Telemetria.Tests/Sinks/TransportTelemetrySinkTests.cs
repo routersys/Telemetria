@@ -26,6 +26,7 @@ public sealed class TransportTelemetrySinkTests
             new HybridPayloadProtector(keyPair.PublicKey, "key-1"),
             new TotpProvider(new OneTimePasswordOptions(), clock),
             new AnonymousIdentityProvider(),
+            NoopRequestSigner.Instance,
             clock);
     }
 

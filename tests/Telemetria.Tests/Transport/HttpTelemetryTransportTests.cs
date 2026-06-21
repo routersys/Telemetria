@@ -83,4 +83,41 @@ public sealed class HttpTelemetryTransportTests
         var (transport, _) = Create(_ => throw new HttpRequestException("connection refused"));
         Assert.False(await transport.SendAsync(Envelope()));
     }
+
+    [Fact]
+    public async Task SendAsync_WithRequestSignature_SendsSignatureHeader()
+    {
+        var (transport, handler) = Create(StatusResponses.WithStatus(HttpStatusCode.OK));
+        var envelope = Envelope() with { RequestSignature = "sig-abc" };
+        await transport.SendAsync(envelope);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("sig-abc", request.Headers.GetValues("X-Telemetria-Signature").Single());
+    }
+
+    [Fact]
+    public async Task SendAsync_WithoutRequestSignature_OmitsSignatureHeader()
+    {
+        var (transport, handler) = Create(StatusResponses.WithStatus(HttpStatusCode.OK));
+        await transport.SendAsync(Envelope());
+
+        var request = Assert.Single(handler.Requests);
+        Assert.False(request.Headers.Contains("X-Telemetria-Signature"));
+    }
+
+    [Fact]
+    public async Task SendAsync_CustomSignatureHeader_UsesConfiguredName()
+    {
+        var options = new TransportOptions
+        {
+            Endpoint = new Uri("https://example.invalid/ingest"),
+            SignatureHeader = "X-Custom-Sig"
+        };
+        var (transport, handler) = Create(StatusResponses.WithStatus(HttpStatusCode.OK), options);
+        var envelope = Envelope() with { RequestSignature = "custom-sig" };
+        await transport.SendAsync(envelope);
+
+        var request = Assert.Single(handler.Requests);
+        Assert.Equal("custom-sig", request.Headers.GetValues("X-Custom-Sig").Single());
+    }
 }

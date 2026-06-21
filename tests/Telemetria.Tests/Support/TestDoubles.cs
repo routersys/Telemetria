@@ -3,6 +3,17 @@ using System.Net;
 
 namespace Telemetria.Tests.Support;
 
+internal sealed class NoopRequestSigner : IRequestSigner
+{
+    public static NoopRequestSigner Instance { get; } = new();
+
+    private NoopRequestSigner() { }
+
+    public string Sign(ReadOnlySpan<byte> payload) => string.Empty;
+
+    public bool Verify(ReadOnlySpan<byte> payload, string signature) => false;
+}
+
 internal sealed class CapturingSink : ITelemetrySink
 {
     private readonly SinkResult _result;

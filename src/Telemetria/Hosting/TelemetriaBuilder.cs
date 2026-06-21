@@ -24,6 +24,7 @@ public sealed class TelemetriaBuilder
     private bool _useLocalFile;
     private bool _useMemory;
     private int _memoryCapacity = 1000;
+    private bool _useRequestSigning;
 
     internal TelemetriaBuilder(IServiceCollection services)
     {
@@ -118,6 +119,15 @@ public sealed class TelemetriaBuilder
         return this;
     }
 
+    /// <summary>P-256 ECDSA によるリクエスト署名を有効にします。</summary>
+    public TelemetriaBuilder UseRequestSigning(Action<RequestSigningOptions> configure)
+    {
+        ArgumentNullException.ThrowIfNull(configure);
+        Services.Configure(configure);
+        _useRequestSigning = true;
+        return this;
+    }
+
     /// <summary>指定したウィンドウ内で重複する信号を抑制するプロセッサを追加します。</summary>
     public TelemetriaBuilder AddDeduplication(Action<DeduplicationOptions>? configure = null)
     {
@@ -162,6 +172,28 @@ public sealed class TelemetriaBuilder
         Services.TryAddSingleton<ISignalBuffer, ChannelSignalBuffer>();
         Services.TryAddSingleton<ISignalExporter, SignalExporter>();
         Services.TryAddSingleton<ITelemetryClient, TelemetryClient>();
+        RegisterRequestSigner();
+    }
+
+    private void RegisterRequestSigner()
+    {
+        if (_useRequestSigning)
+        {
+            Services.TryAddSingleton<IRequestSigner>(sp =>
+            {
+                var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<RequestSigningOptions>>().Value;
+                if (string.IsNullOrWhiteSpace(opts.PrivateKeyBase64))
+                {
+                    throw new InvalidOperationException("リクエスト署名には秘密鍵の設定が必要です。");
+                }
+
+                return new EcdsaRequestSigner(Convert.FromBase64String(opts.PrivateKeyBase64));
+            });
+        }
+        else
+        {
+            Services.TryAddSingleton<IRequestSigner>(_ => NullRequestSigner.Instance);
+        }
     }
 
     private void RegisterPipeline()
