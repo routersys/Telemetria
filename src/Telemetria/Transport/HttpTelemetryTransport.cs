@@ -53,6 +53,10 @@ public sealed class HttpTelemetryTransport : ITelemetryTransport
         request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json") { CharSet = "utf-8" };
         request.Headers.TryAddWithoutValidation(options.OneTimePasswordHeader, envelope.OneTimePassword);
         request.Headers.TryAddWithoutValidation(options.AnonymousIdHeader, envelope.AnonymousId);
+        if (envelope.RequestSignature is not null)
+        {
+            request.Headers.TryAddWithoutValidation(options.SignatureHeader, envelope.RequestSignature);
+        }
 
         using var timeoutSource = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutSource.CancelAfter(options.Timeout);
