@@ -22,6 +22,8 @@ public sealed class TelemetriaBuilder
     private readonly List<Action<IServiceCollection>> _processorRegistrations = [];
     private bool _useRemote;
     private bool _useLocalFile;
+    private bool _useMemory;
+    private int _memoryCapacity = 1000;
 
     internal TelemetriaBuilder(IServiceCollection services)
     {
@@ -107,6 +109,27 @@ public sealed class TelemetriaBuilder
         return this;
     }
 
+    /// <summary>メモリ上にテレメトリ信号を保持するシンクを有効にします。</summary>
+    public TelemetriaBuilder UseMemory(int capacity = 1000)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(capacity, 0);
+        _useMemory = true;
+        _memoryCapacity = capacity;
+        return this;
+    }
+
+    /// <summary>指定したウィンドウ内で重複する信号を抑制するプロセッサを追加します。</summary>
+    public TelemetriaBuilder AddDeduplication(Action<DeduplicationOptions>? configure = null)
+    {
+        if (configure is not null)
+        {
+            Services.Configure(configure);
+        }
+
+        _processorRegistrations.Add(static services => services.AddSingleton<ISignalProcessor, DeduplicationProcessor>());
+        return this;
+    }
+
     /// <summary>サーバーを用いないローカルファイルへの書き出しを有効にします。</summary>
     public TelemetriaBuilder UseLocalFile(Action<FileSinkOptions>? configure = null)
     {
@@ -125,6 +148,7 @@ public sealed class TelemetriaBuilder
         RegisterPipeline();
         RegisterRemote();
         RegisterLocalFile();
+        RegisterMemory();
         RegisterSink();
         RegisterDispatcher();
     }
@@ -198,6 +222,15 @@ public sealed class TelemetriaBuilder
         }
     }
 
+    private void RegisterMemory()
+    {
+        if (_useMemory)
+        {
+            var capacity = _memoryCapacity;
+            Services.TryAddSingleton(_ => new InMemoryTelemetrySink(capacity));
+        }
+    }
+
     private void RegisterSink()
     {
         Services.TryAddSingleton<ITelemetrySink>(sp => BuildSink(sp));
@@ -217,6 +250,11 @@ public sealed class TelemetriaBuilder
         if (_useLocalFile)
         {
             sinks.Add(sp.GetRequiredService<FileTelemetrySink>());
+        }
+
+        if (_useMemory)
+        {
+            sinks.Add(sp.GetRequiredService<InMemoryTelemetrySink>());
         }
 
         return sinks.Count switch

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Telemetria.Hosting;
+using Telemetria.Pipeline;
 using Telemetria.Security;
 using Telemetria.Sinks;
 using Xunit;
@@ -95,6 +96,62 @@ public sealed class DependencyInjectionTests : IDisposable
         Assert.Contains("ItApp", content);
         Assert.Contains("[email]", content);
         Assert.DoesNotContain("alice@example.com", content);
+    }
+
+    [Fact]
+    public void AddTelemetria_Memory_ResolvesInMemorySink()
+    {
+        using var provider = Build(builder => builder.UseMemory());
+        Assert.IsType<InMemoryTelemetrySink>(provider.GetRequiredService<ITelemetrySink>());
+    }
+
+    [Fact]
+    public void AddTelemetria_MemoryAndLocalFile_ResolvesCompositeSink()
+    {
+        using var provider = Build(builder =>
+        {
+            builder.UseMemory();
+            builder.UseLocalFile(o => o.Directory = _directory);
+        });
+        Assert.IsType<CompositeTelemetrySink>(provider.GetRequiredService<ITelemetrySink>());
+    }
+
+    [Fact]
+    public void AddTelemetria_Memory_SinkIsAccessibleDirectly()
+    {
+        using var provider = Build(builder => builder.UseMemory(500));
+        Assert.NotNull(provider.GetRequiredService<InMemoryTelemetrySink>());
+    }
+
+    [Fact]
+    public void AddTelemetria_UseMemory_ZeroCapacity_Throws()
+        => Assert.Throws<ArgumentOutOfRangeException>(() => Build(builder => builder.UseMemory(0)));
+
+    [Fact]
+    public void AddDeduplication_RegistersProcessor()
+    {
+        using var provider = Build(builder => builder.AddDeduplication());
+        var processors = provider.GetServices<ISignalProcessor>().ToList();
+        Assert.Contains(processors, p => p is DeduplicationProcessor);
+    }
+
+    [Fact]
+    public void AddDeduplication_WithOptions_ConfiguresWindow()
+    {
+        using var provider = Build(builder =>
+            builder.AddDeduplication(o => o.Window = TimeSpan.FromSeconds(30)));
+
+        var opts = provider.GetRequiredService<Microsoft.Extensions.Options.IOptions<DeduplicationOptions>>().Value;
+        Assert.Equal(TimeSpan.FromSeconds(30), opts.Window);
+    }
+
+    [Fact]
+    public void AddTelemetria_ResolvesScope_ViaBeginOperation()
+    {
+        using var provider = Build(_ => { });
+        var client = provider.GetRequiredService<ITelemetryClient>();
+        using var scope = client.BeginOperation("test-op");
+        Assert.NotNull(scope);
     }
 
     public void Dispose()
