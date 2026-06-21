@@ -20,7 +20,6 @@ on:
 
 permissions:
   contents: write
-  id-token: write
 
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "1"
@@ -81,20 +80,34 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const idToken = await core.getIDToken('api://AzureADTokenExchange');
-            const response = await fetch('https://www.nuget.org/api/v1/authentication/authenticate', {
+            const audience = 'api://AzureADTokenExchange';
+            const endpoint = 'https://www.nuget.org/api/v1/authentication/authenticate';
+
+            core.info(`OIDC audience: ${audience}`);
+            core.info(`NuGet 認証エンドポイント: ${endpoint}`);
+
+            const idToken = await core.getIDToken(audience);
+            core.info('GitHub OIDC トークンの取得に成功しました');
+
+            const response = await fetch(endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ oidcToken: idToken }),
             });
+
+            core.info(`NuGet 応答ステータス: ${response.status}`);
+
             if (!response.ok) {
               const text = await response.text();
-              core.setFailed(`NuGet 認証に失敗しました (${response.status}): ${text}`);
+              core.info(`NuGet 応答本文: ${text}`);
+              core.setFailed(`NuGet 認証に失敗しました (${response.status})`);
               return;
             }
+
             const data = await response.json();
             core.setSecret(data.tokenValue);
             core.setOutput('token', data.tokenValue);
+            core.info('NuGet 一時 API キーの取得に成功しました');
 
       - name: NuGet.org へ発行 (ドライランでない場合のみ)
         if: ${{ !inputs.dry_run }}
