@@ -103,6 +103,13 @@ public sealed class TelemetryClient : ITelemetryClient
         });
 
     /// <inheritdoc />
+    public ITelemetryScope BeginOperation(string name, IReadOnlyDictionary<string, string>? properties = null)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(name);
+        return new TelemetryScope(name, this, _timeProvider, properties);
+    }
+
+    /// <inheritdoc />
     public ValueTask FlushAsync(CancellationToken cancellationToken = default) => _exporter.FlushAsync(cancellationToken);
 
     private static string Require(string name)

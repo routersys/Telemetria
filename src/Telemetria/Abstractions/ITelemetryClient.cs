@@ -20,6 +20,9 @@ public interface ITelemetryClient
     /// <summary>数値計測値を記録します。</summary>
     void TrackMetric(string name, double value, IReadOnlyDictionary<string, string>? properties = null);
 
+    /// <summary>操作の開始を宣言し、破棄時に所要時間を自動記録するスコープを返します。</summary>
+    ITelemetryScope BeginOperation(string name, IReadOnlyDictionary<string, string>? properties = null);
+
     /// <summary>未送信の信号を確実に送出します。</summary>
     ValueTask FlushAsync(CancellationToken cancellationToken = default);
 }
